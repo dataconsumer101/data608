@@ -1,0 +1,242 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document: default
+---
+
+**Principles of Data Visualization and Introduction to ggplot2**
+
+I have provided you with data about the 5,000 fastest growing companies in the US, as compiled by Inc. magazine. lets read this in:
+
+```{r}
+
+inc <- read.csv("https://raw.githubusercontent.com/charleyferrari/CUNY_DATA_608/master/module1/Data/inc5000_data.csv", header= TRUE)
+
+```
+
+And lets preview this data:
+
+```{r}
+
+head(inc)
+
+```
+```{r}
+
+summary(inc)
+
+```
+
+```{r, warning = F, message = F}
+options(scipen=100)
+
+library(dplyr)
+library(ggplot2)
+```
+
+Think a bit on what these summaries mean. Use the space below to add some more relevant non-visual exploratory information you think helps you understand this data:
+
+```{r}
+
+# Insert your code here, create more chunks as necessary
+
+# Company Count by Industry
+sort(table(inc$Industry), decreasing = T)
+
+# % of Companies w/ <= 100 Employees
+sum(inc$Employees <= 100, na.rm = T) / nrow(inc)
+```
+
+\pagebreak
+
+```{r}
+# Company Count by State
+sort(table(inc$State), decreasing = T)
+
+# Top 10 Cities by Company Count
+group_by(inc, City) %>%
+  summarize(count = n(), .groups = 'drop') %>%
+  arrange(desc(count)) %>%
+  top_n(10)
+
+# Top 10 Companies by Revenue
+mutate(inc, Revenue_in_Billions = Revenue/1000000000) %>%
+  select(Name, Industry, Revenue_in_Billions) %>%
+  arrange(desc(Revenue_in_Billions)) %>%
+  top_n(10)
+```
+
+\pagebreak
+
+```{r}
+# Top 10 Fastest Growing Companies
+select(inc, Name, Industry, Growth_Rate) %>%
+  arrange(desc(Growth_Rate)) %>%
+  top_n(10)
+
+# Top 10 Industries - Average Growth
+group_by(inc, Industry) %>%
+  summarize(avg_growth_rate = mean(Growth_Rate, na.rm = T), .groups = 'drop') %>%
+  arrange(desc(avg_growth_rate)) %>%
+  top_n(10)
+```
+
+\pagebreak
+
+## Question 1
+
+Create a graph that shows the distribution of companies in the dataset by State (ie how many are in each state). There are a lot of States, so consider which axis you should use. This visualization is ultimately going to be consumed on a 'portrait' oriented screen (ie taller than wide), which should further guide your layout choices.
+
+```{r, fig.height = 5.5}
+# Answer Question 1 here
+# Companies by State
+group_by(inc, State) %>%
+  summarize(count = n(), .groups = 'drop') %>%
+  ggplot(aes(y = reorder(State, count), x = count)) +
+  geom_col() +
+  theme_bw() +
+  labs(x = 'Number of Companies', 
+       y = 'State',
+       title = 'Distribution of Companies by State') +
+  theme(axis.text.y = element_text(size = 6))
+
+```
+
+## Quesiton 2
+
+Lets dig in on the state with the 3rd most companies in the data set. Imagine you work for the state and are interested in how many people are employed by companies in different industries. Create a plot that shows the average and/or median employment by industry for companies in this state (only use cases with full data, use R's `complete.cases()` function.) In addition to this, your graph should show how variable the ranges are, and you should deal with outliers.
+
+```{r}
+# Answer Question 2 here
+# ny <- filter(inc, State == 'NY' & !is.na(Industry) & !is.na(Employees))
+ny <- filter(inc, State == 'NY' & complete.cases(inc) == T)
+
+# Industry Summary
+industry_scale <- group_by(ny, Industry) %>%
+  summarize(max_e = max(Employees), 
+            avg_e = mean(Employees),
+            med_e = median(Employees),
+            .groups = 'drop')
+
+# quick peek at max number of employees by industry
+ggplot(industry_scale, aes(x = reorder(Industry, max_e), y = max_e)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = element_blank(),
+       y = element_blank())
+```
+
+\pagebreak
+
+```{r}
+# based on the max employee chart, lets split the industries into small, medium, and large
+industry_scale$size <- with(industry_scale, ifelse(max_e >= 10000, 'Large', 
+                                                   ifelse(max_e >= 100, 'Medium', 'Small')))
+
+industry_scale$size <- factor(industry_scale$size, levels = c('Small', 'Medium', 'Large'))
+
+# Relabel Industries
+industry_scale$label <- with(industry_scale, 
+                             paste0(Industry, ' (', round(avg_e, 0), ', ', round(med_e, 0), ')'))
+
+# join industry size and labels
+ny <- inner_join(ny, industry_scale, by = c('Industry' = 'Industry'))
+             
+# Distribution of Employees by Industry in NY State
+ggplot(ny, aes(x = Employees, y = reorder(label, med_e))) +
+  geom_boxplot() +
+  facet_wrap(~size, scale = 'free_x') +
+  labs(y = 'Industry (Average Employees, Median Employees)',
+       title = 'Employees Distributions by Industry in NY',
+       subtitle = 'Size Based on Largest Company in Each Industry') +
+  theme(axis.title.y = element_text(size = 10),
+        axis.text.y = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.text.x = element_text(size = 8))
+```
+
+## Question 3
+
+Now imagine you work for an investor and want to see which industries generate the most revenue per employee. Create a chart that makes this information clear. Once again, the distribution per industry should be shown.
+
+```{r}
+# Answer Question 3 here
+filter(inc, !is.na(Revenue) & !is.na(Employees) & !is.na(Industry)) %>%
+  group_by(Industry) %>%
+  summarize(rpe = sum(Revenue) / sum(Employees), .groups = 'drop') %>%
+  ggplot(aes(y = reorder(Industry, rpe), x = rpe/1000)) +
+  geom_col() +
+  theme_bw() +
+  labs(x = 'Revenue Per Employee (in Thousands)',
+       y = 'Industry',
+       title = 'Revenue per Employee Averages by Industry') +
+  theme(axis.text.y = element_text(size = 8),
+        axis.title.y = element_text(size = 10),
+        axis.title.x = element_text(size = 10))
+```
+
+\pagebreak
+
+```{r}
+# add calculated field
+inc$rpe <- with(inc, Revenue / Employees)
+
+# calculate summary stats per industry
+med_rpe <- group_by(inc, Industry) %>%
+  summarize(med_rpe = median(rpe, na.rm = T),
+            avg_rpe = mean(rpe, na.rm = T),
+            max_rpe = max(rpe, na.rm = T),
+            .groups = 'drop')
+
+# check distribution of max rpe to determine where to split chart
+ggplot(med_rpe, aes(x = max_rpe)) +
+  geom_density()
+
+# Looks like we can try to split around 10M
+```
+
+\pagebreak
+
+```{r}
+# create label
+med_rpe$label <- with(med_rpe, 
+                      paste0(Industry, 
+                             ' (', round(avg_rpe/100, 0), ', ', round(med_rpe/1000, 0), ')'))
+
+# plot < 10M
+inner_join(inc, med_rpe, by = c('Industry' = 'Industry')) %>%
+filter(!is.na(rpe) & max_rpe < 10000000) %>%
+  ggplot(aes(y = reorder(label, med_rpe), x = rpe/1000000)) +
+  geom_boxplot() +
+  theme(axis.title.y = element_text(size = 10),
+        axis.text.y = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.text.x = element_text(size = 8)) +
+  labs(x = 'Revenue Per Employee (in Millions)',
+       y = 'Industry (Average RPE, Median RPE)',
+       title = 'Distribution of Revenue per Employees by Industry',
+       subtitle = 'Group 1')
+```
+
+\pagebreak
+
+```{r}
+# plot >= 10M
+inner_join(inc, med_rpe, by = c('Industry' = 'Industry')) %>%
+filter(!is.na(rpe) & max_rpe >= 10000000) %>%
+  ggplot(aes(y = reorder(label, med_rpe), x = rpe/1000000)) +
+  geom_boxplot() +
+  theme(axis.title.y = element_text(size = 10),
+        axis.text.y = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.text.x = element_text(size = 8)) +
+  labs(x = 'Revenue Per Employee (in Millions)',
+       y = 'Industry (Average RPE, Median RPE)',
+       title = 'Distribution of Revenue per Employees by Industry',
+       subtitle = 'Group 2')
+
+```
+
+
