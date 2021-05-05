@@ -148,7 +148,7 @@ server <- function(input, output) {
         summarize(count = n(),
                   .groups = 'drop') %>%
         ggplot(aes(x = month, y = count)) +
-        geom_line() +
+        geom_line(color = 'darkred') +
         stat_smooth(geom='line', alpha = .3) +
         labs(x = element_blank(),
              y = '# of Shootings',
@@ -164,7 +164,7 @@ server <- function(input, output) {
         summarize(count = n(),
                   .groups = 'drop') %>%
         ggplot(aes(x = month, y = count)) +
-        geom_line() +
+        geom_line(color = 'darkred') +
         stat_smooth(geom='line', alpha = .3) +
         labs(x = element_blank(),
              y = '# of Shootings',
@@ -195,9 +195,25 @@ server <- function(input, output) {
       
     } else { # if a borough is selected
       
+      color_key <- NULL
+      
+      if (input$boro == 'Bronx') {
+        color_key <- '#DDCC77'
+      } else if (input$boro == 'Brooklyn') {
+        color_key <- '#88CCEE'
+      } else if (input$boro == 'Manhattan') {
+        color_key <- '#44AA99'
+      } else if (input$boro == 'Queens') {
+        color_key <- '#117733'
+      } else if (input$boro == 'Staten Island') {
+        color_key <- '#332288'
+      } else {
+        color_key <- 'red4'  
+      }
+      
       filter(share, boro == input$boro) %>%
       ggplot(aes(x = yr, y = share)) +
-        geom_line() +
+        geom_line(color = color_key, size = 2) +
         stat_smooth(geom='line', alpha = .3) +
         labs(x = 'Year',
              y = '% of Shootings',
@@ -302,7 +318,7 @@ server <- function(input, output) {
     df2 %>%
       top_n(30, share) %>%
       ggplot(aes(x = reorder(seg, count), y = share)) +
-      geom_col() +
+      geom_col(fill = 'darkred', alpha = .8) +
       coord_flip() +
       labs(y = 'Probability',
            x = demo_label,
